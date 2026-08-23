@@ -49,7 +49,7 @@
         <div class="flex gap-3">
           <button
             type="button"
-            class="flex size-8 items-center justify-center border-neutral-500/50 p-1.5 text-neutral-500 transition-colors disabled:cursor-not-allowed disabled:border-neutral-500/30 disabled:text-neutral-500/50"
+            class="flex size-8 items-center justify-center border border-neutral-500/50 p-1.5 text-neutral-500 transition-colors disabled:cursor-not-allowed disabled:border-neutral-500/30 disabled:text-neutral-500/50"
             aria-label="Previous page"
             disabled={current_page === 1}
             onclick={() => go_to_page(current_page - 1)}>
@@ -62,18 +62,18 @@
               id="{id}-page"
               value={current_page}
               oninput={(event) => {
-                const val = parseInt(event.currentTarget.value);
+                const val = Number(event.currentTarget.value);
                 if (1 <= val && val <= total_pages) {
                   go_to_page(val);
                 }
               }}
-              class="h-8 w-10 border-neutral-500/50 bg-transparent px-1 text-center font-mono text-current outline-none focus:border-current" />
+              class="h-8 w-10 border border-neutral-500/50 bg-transparent px-1 text-center font-mono text-current outline-none focus:border-current" />
             <span>of {total_pages}</span>
           </div>
 
           <button
             type="button"
-            class="flex size-8 items-center justify-center border-neutral-500/50 p-1.5 transition-colors disabled:cursor-not-allowed disabled:border-neutral-500/30 disabled:text-neutral-500/50"
+            class="flex size-8 items-center justify-center border border-neutral-500/50 p-1.5 transition-colors disabled:cursor-not-allowed disabled:border-neutral-500/30 disabled:text-neutral-500/50"
             aria-label="Next page"
             disabled={current_page === total_pages}
             onclick={() => go_to_page(current_page + 1)}>
