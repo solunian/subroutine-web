@@ -2,6 +2,7 @@
   import { enhance } from "$app/forms";
   import ActivityGrid from "$lib/components/activity_grid.svelte";
   import DotSemaphore from "$lib/components/dot_semaphore.svelte";
+  import DropdownMenuContent from "$lib/components/dropdown_menu_content.svelte";
   import Entries from "$lib/components/entries.svelte";
   import Torch from "$lib/components/torch.svelte";
   import TypeIdenticon from "$lib/components/type_identicon.svelte";
@@ -9,7 +10,10 @@
   import AtSymbol from "$lib/icons/at_symbol.svelte";
   import Check from "$lib/icons/check.svelte";
   import EllipsisHorizontal from "$lib/icons/ellipsis_horizontal.svelte";
+  import Pencil from "$lib/icons/pencil.svelte";
+  import Trash from "$lib/icons/trash.svelte";
   import XMark from "$lib/icons/x_mark.svelte";
+  import { DropdownMenu } from "bits-ui";
 
   let { data } = $props();
 
@@ -67,7 +71,26 @@
               </button>
             </form>
           {/if}
-          <button class="opacity-50"><EllipsisHorizontal /></button>
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger class="text-neutral-500">
+              <EllipsisHorizontal />
+            </DropdownMenu.Trigger>
+            <DropdownMenuContent forceMount align="start">
+              <DropdownMenu.Item>
+                <button
+                  onclick={() => (editing_title = true)}
+                  class="hover:text-curing-current flex min-w-40 items-center gap-2 p-2 text-left text-neutral-500 transition-colors duration-150 hover:bg-neutral-500/10">
+                  <span class="size-5"><Pencil /></span> rename
+                </button>
+              </DropdownMenu.Item>
+              <DropdownMenu.Item>
+                <button
+                  class="hover:text-curing-current flex min-w-40 items-center gap-2 p-2 text-left text-neutral-500 transition-colors duration-150 hover:bg-neutral-500/10">
+                  <span class="size-5"><Trash /></span> delete
+                </button>
+              </DropdownMenu.Item>
+            </DropdownMenuContent>
+          </DropdownMenu.Root>
         </div>
       </div>
 
