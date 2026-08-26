@@ -36,26 +36,19 @@
       {/if}
     </header>
 
-    <div class="grid grid-cols-1 md:grid-cols-5 lg:grid-cols-7 2xl:grid-cols-9">
-      <div class="col-span-3 md:col-start-2 lg:col-start-3 2xl:col-start-4">
-        {#if data.subroutine.type === "dot" || data.subroutine.type === "semaphore"}
-          <DotSemaphore
-            editable={data.is_self}
-            subroutine={data.subroutine}
-            entries={data.entries} />
-        {:else if data.subroutine.type === "torch"}
-          <Torch editable={data.is_self} subroutine={data.subroutine} entries={data.entries} />
-        {:else}
-          <div class="flex aspect-video w-full items-center justify-center border font-mono">
-            not implemented yet -_-
-          </div>
-        {/if}
-      </div>
+    <div class="max-w-5xl">
+      {#if data.subroutine.type === "dot" || data.subroutine.type === "semaphore"}
+        <DotSemaphore editable={data.is_self} subroutine={data.subroutine} entries={data.entries} />
+      {:else if data.subroutine.type === "torch"}
+        <Torch editable={data.is_self} subroutine={data.subroutine} entries={data.entries} />
+      {:else}
+        <div class="flex aspect-video w-full items-center justify-center border font-mono">
+          not implemented yet -_-
+        </div>
+      {/if}
     </div>
 
-    <div class="justify-center-safe lg:flex">
-      <ActivityGrid entries={data.entries} subroutine_type={data.subroutine.type} />
-    </div>
+    <ActivityGrid entries={data.entries} subroutine_type={data.subroutine.type} />
 
     <Entries entries={data.entries} editable={data.is_self} />
 

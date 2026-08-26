@@ -5,156 +5,152 @@
 
   type EntryActivity = Pick<Tables<"entries">, "created_at">;
   type SubroutineType = Tables<"subroutines">["type"];
+  type ActivityByDay = Record<string, number>;
+  type Props = {
+    entries?: EntryActivity[];
+    weeks?: number;
+    subroutine_type?: SubroutineType;
+  };
   type GridDay = {
     date: Date;
     key: string;
     value: number;
     is_today: boolean;
   };
+  type WeekColumn = {
+    key: string;
+    label: string;
+    days: GridDay[];
+  };
 
-  let {
-    entries = [],
-    weeks = 52,
-    subroutine_type,
-  }: {
-    entries?: EntryActivity[];
-    weeks?: number;
-    subroutine_type?: SubroutineType;
-  } = $props();
+  let { entries = [], weeks = 52, subroutine_type }: Props = $props();
 
-  // Assumes 0 = Sunday, 1 = Monday...
+  // The grid starts on Monday and only labels alternating rows to save space.
   const short_day_names = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 
-  function add_duration(duration_map: Map<string, number>, start: Date, end: Date) {
-    const cur = get_day_start(start);
+  // Add a timed session to each calendar day it crosses.
+  function add_duration(activity: ActivityByDay, start: Date, end: Date) {
+    let cursor = get_day_start(start);
 
-    while (cur < end) {
-      const key = to_date_str(cur);
-      const segment_start = Math.max(start.getTime(), cur.getTime());
-      const segment_end = Math.min(end.getTime(), get_next_day(cur).getTime());
-      duration_map.set(
-        key,
-        (duration_map.get(key) ?? 0) + Math.max(0, segment_end - segment_start)
-      );
-      cur.setDate(cur.getDate() + 1);
+    while (cursor < end) {
+      const key = to_date_str(cursor);
+      const next_day = get_next_day(cursor);
+      const segment_start = Math.max(start.getTime(), cursor.getTime());
+      const segment_end = Math.min(end.getTime(), next_day.getTime());
+      activity[key] = (activity[key] ?? 0) + Math.max(0, segment_end - segment_start);
+      cursor = next_day;
     }
   }
 
-  function count_activity_class(count: number, max_count: number) {
-    if (count <= 0 || max_count <= 0) return "bg-neutral-500/15";
+  // Convert entries into one value per day: entry counts normally, durations for torches.
+  function get_activity_by_day(end: Date): ActivityByDay {
+    const activity: ActivityByDay = {};
 
-    const intensity = count / max_count;
-    if (intensity >= 0.8) return "bg-green-500/80";
-    if (intensity >= 0.4) return "bg-green-500/60";
-    if (intensity >= 0.2) return "bg-green-500/40";
-    return "bg-green-500/20";
-  }
-
-  function duration_activity_class(duration: number, max_duration: number) {
-    if (duration <= 0 || max_duration <= 0) return "bg-neutral-500/15";
-
-    const intensity = duration / max_duration;
-    if (intensity >= 0.8) return "bg-amber-500/80";
-    if (intensity >= 0.4) return "bg-amber-500/60";
-    if (intensity >= 0.2) return "bg-amber-500/40";
-    return "bg-amber-500/20";
-  }
-
-  function activity_class(value: number, max_value: number) {
-    if (subroutine_type === "torch") {
-      return duration_activity_class(value, max_value);
-    }
-    return count_activity_class(value, max_value);
-  }
-
-  let today = $derived.by(() => {
-    const date = new Date(now);
-    date.setHours(0, 0, 0, 0);
-    return date;
-  });
-
-  let activity_counts = $derived.by(() => {
-    const counts = new Map<string, number>();
-
-    for (const entry of entries) {
-      const key = to_date_str(new Date(entry.created_at));
-      counts.set(key, (counts.get(key) ?? 0) + 1);
+    if (subroutine_type !== "torch") {
+      for (const entry of entries) {
+        const key = to_date_str(new Date(entry.created_at));
+        activity[key] = (activity[key] ?? 0) + 1;
+      }
+      return activity;
     }
 
-    return counts;
-  });
-
-  let activity_durations = $derived.by(() => {
-    const durations = new Map<string, number>();
-    if (subroutine_type !== "torch") return durations;
-
-    for (let idx = 0; idx < Math.floor(entries.length / 2) * 2; idx += 2) {
+    // Torch entries alternate between session start and session end.
+    const complete_entry_count = entries.length - (entries.length % 2);
+    for (let idx = 0; idx < complete_entry_count; idx += 2) {
       add_duration(
-        durations,
+        activity,
         new Date(entries[idx].created_at),
         new Date(entries[idx + 1].created_at)
       );
     }
 
+    // An unmatched final entry means the current session is still running.
     if (entries.length % 2 !== 0) {
-      add_duration(durations, new Date(entries[entries.length - 1].created_at), now);
+      add_duration(activity, new Date(entries.at(-1)!.created_at), end);
     }
 
-    return durations;
-  });
+    return activity;
+  }
 
-  let days = $derived.by(() => {
-    const end = new Date(today);
-    const start = new Date(end);
-    start.setDate(end.getDate() - (weeks * 7 - 1));
-    start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+  // Choose a color by comparing a day with the busiest day in the visible grid.
+  function activity_class(value: number, max_value: number) {
+    if (value <= 0 || max_value <= 0) return "bg-neutral-500/15";
+
+    const colors =
+      subroutine_type === "torch"
+        ? ["bg-amber-500/20", "bg-amber-500/40", "bg-amber-500/60", "bg-amber-500/80"]
+        : ["bg-green-500/20", "bg-green-500/40", "bg-green-500/60", "bg-green-500/80"];
+    const intensity = value / max_value;
+
+    if (intensity >= 0.8) return colors[3];
+    if (intensity >= 0.4) return colors[2];
+    if (intensity >= 0.2) return colors[1];
+    return colors[0];
+  }
+
+  // Build everything the template needs in one reactive pass.
+  let grid = $derived.by(() => {
+    const today = get_day_start(now);
+    const today_key = to_date_str(today);
+    const activity = get_activity_by_day(now);
+
+    // Include the requested range, then extend backwards to the preceding Monday.
+    const requested_start = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate() - (weeks * 7 - 1)
+    );
+    const start = new Date(
+      requested_start.getFullYear(),
+      requested_start.getMonth(),
+      requested_start.getDate() - ((requested_start.getDay() + 6) % 7)
+    );
 
     const grid_days: GridDay[] = [];
-    const cursor = new Date(start);
+    let max_value = 0;
 
-    while (cursor <= end) {
+    for (let cursor = start; cursor <= today; cursor = get_next_day(cursor)) {
       const key = to_date_str(cursor);
+      const value = activity[key] ?? 0;
       grid_days.push({
         date: new Date(cursor),
         key,
-        value:
-          subroutine_type === "torch"
-            ? (activity_durations.get(key) ?? 0)
-            : (activity_counts.get(key) ?? 0),
-        is_today: key === to_date_str(today),
+        value,
+        is_today: key === today_key,
       });
-      cursor.setDate(cursor.getDate() + 1);
+      max_value = Math.max(max_value, value);
     }
 
-    return grid_days;
-  });
-
-  let max_value = $derived(days.reduce((val, day) => Math.max(val, day.value), 0));
-
-  let hovered_day_key = $state<string | null>(null);
-
-  let selected_day = $derived.by(() => {
-    const selected_key = hovered_day_key ?? to_date_str(today);
-    return days.find((day) => day.key === selected_key) ?? days.at(-1);
-  });
-
-  let week_columns = $derived.by(() => {
-    const columns: (typeof days)[] = [];
-    for (let idx = 0; idx < days.length; idx += 7) {
-      columns.push(days.slice(idx, idx + 7));
+    // Split the flat day list into the vertical week columns shown by the UI.
+    const week_days: GridDay[][] = [];
+    for (let idx = 0; idx < grid_days.length; idx += 7) {
+      week_days.push(grid_days.slice(idx, idx + 7));
     }
-    return columns;
-  });
 
-  let month_labels = $derived.by(() =>
-    week_columns.map((week, idx) => {
+    // Label the first visible week and the first Monday of each month.
+    const labels = week_days.map((week, idx) => {
       const first = week[0]?.date;
       if (!first) return "";
       if (idx === 0 || first.getDate() <= 7) {
         return first.toLocaleDateString("en", { month: "short" }).toLowerCase();
       }
       return "";
-    })
+    });
+
+    const columns: WeekColumn[] = week_days.map((days, idx) => ({
+      key: days[0]?.key ?? String(idx),
+      // Hide the earlier label if two adjacent labels would overlap.
+      label: labels[idx + 1] ? "" : labels[idx],
+      days,
+    }));
+
+    return { columns, days: grid_days, max_value, today_key };
+  });
+
+  // Hovering temporarily replaces today's summary in the footer.
+  let hovered_day_key = $state<string | null>(null);
+  let selected_day = $derived(
+    grid.days.find((day) => day.key === (hovered_day_key ?? grid.today_key)) ?? grid.days.at(-1)
   );
 </script>
 
@@ -164,17 +160,17 @@
       class="inline-grid gap-x-2 gap-y-1 p-2"
       role="presentation"
       onpointerleave={() => (hovered_day_key = null)}>
+      <!-- Month labels share the same columns as the activity grid below. -->
       <div
         class="grid gap-0.5 pl-8"
-        style:grid-template-columns="repeat({week_columns.length}, 0.75rem)">
-        {#each month_labels as label, idx (`${label}-${idx}`)}
-          <div class="h-4 text-xs text-neutral-500">{label}</div>
+        style:grid-template-columns="repeat({grid.columns.length}, 0.75rem)">
+        {#each grid.columns as column (column.key)}
+          <div class="h-4 text-xs text-neutral-500">{column.label}</div>
         {/each}
       </div>
 
-      <div
-        class="inline-flex gap-0.5 pt-1"
-        style:grid-template-columns="repeat({week_columns.length}, 0.75rem)">
+      <!-- Weekday names sit beside one vertical column for each week. -->
+      <div class="inline-flex gap-0.5 pt-1">
         <div class="flex w-8 flex-col gap-0.5 text-xs text-neutral-500">
           {#each short_day_names as day_name, day_idx (day_name)}
             <div class="h-3">
@@ -183,9 +179,9 @@
           {/each}
         </div>
 
-        {#each week_columns as week, week_idx (week_idx)}
+        {#each grid.columns as column (column.key)}
           <div class="flex flex-col gap-0.5">
-            {#each week as day (day.key)}
+            {#each column.days as day (day.key)}
               <div
                 class="size-3"
                 role="presentation"
@@ -195,7 +191,7 @@
                   class={[
                     "size-3 border border-neutral-500/10 transition hover:border-neutral-500/70",
                     day.is_today && hovered_day_key === null && "border-neutral-500/70",
-                    activity_class(day.value, max_value),
+                    activity_class(day.value, grid.max_value),
                   ]}>
                 </div>
               </div>
@@ -206,6 +202,7 @@
     </div>
   </div>
 
+  <!-- Show today's value by default, or the hovered day's value. -->
   {#if selected_day}
     <div
       class="flex w-full justify-between border-t border-neutral-500/50 px-3 py-2 font-mono text-base text-neutral-500">
