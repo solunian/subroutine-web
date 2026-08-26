@@ -21,6 +21,8 @@ export function empty_to_undefined<TSchema extends v.BaseSchema<any, any, any>>(
   );
 }
 
+export const UUIDSchema = v.pipe(TrimNormalStrSchema, v.uuid("invalid uuid"));
+
 export const EmailSchema = v.pipe(TrimNormalStrSchema, v.email("invalid email"));
 
 export const PasswordSchema = v.pipe(
