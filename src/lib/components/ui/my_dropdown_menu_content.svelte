@@ -13,7 +13,7 @@
   } = $props();
 </script>
 
-<DropdownMenu.Content bind:ref {...restProps} forceMount={true}>
+<DropdownMenu.Content bind:ref {...restProps} forceMount>
   {#snippet child({ wrapperProps, props, open })}
     {#if open}
       <div {...wrapperProps}>

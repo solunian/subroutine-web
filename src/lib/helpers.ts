@@ -64,3 +64,6 @@ export const from_now = (now: Date, date_input: Date) => {
     }
   }
 };
+
+export const diff_days = (date1: Date, date2: Date) =>
+  Math.ceil(Math.abs(date2.getTime() - date1.getTime()) / 86400000);

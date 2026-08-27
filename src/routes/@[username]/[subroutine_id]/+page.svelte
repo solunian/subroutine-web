@@ -2,11 +2,11 @@
   import { enhance } from "$app/forms";
   import ActivityGrid from "$lib/components/activity_grid.svelte";
   import DotSemaphore from "$lib/components/dot_semaphore.svelte";
-  import DropdownMenuContent from "$lib/components/dropdown_menu_content.svelte";
+  import MyDropdownMenuContent from "$lib/components/ui/my_dropdown_menu_content.svelte";
   import Entries from "$lib/components/entries.svelte";
   import Torch from "$lib/components/torch.svelte";
   import TypeIdenticon from "$lib/components/type_identicon.svelte";
-  import { to_date_str } from "$lib/helpers";
+  import { diff_days, to_date_str } from "$lib/helpers";
   import AtSymbol from "$lib/icons/at_symbol.svelte";
   import Check from "$lib/icons/check.svelte";
   import EllipsisHorizontal from "$lib/icons/ellipsis_horizontal.svelte";
@@ -14,6 +14,8 @@
   import Trash from "$lib/icons/trash.svelte";
   import XMark from "$lib/icons/x_mark.svelte";
   import { DropdownMenu } from "bits-ui";
+  import MyDialog from "$lib/components/ui/my_dialog.svelte";
+  import { now } from "$lib/state/time.svelte";
 
   let { data } = $props();
 
@@ -25,6 +27,8 @@
       title_input?.focus();
     }
   });
+
+  let opened_delete_dialog = $state(false);
 </script>
 
 {#if data.session}
@@ -75,21 +79,22 @@
             <DropdownMenu.Trigger class="text-neutral-500">
               <EllipsisHorizontal />
             </DropdownMenu.Trigger>
-            <DropdownMenuContent forceMount align="start">
+            <MyDropdownMenuContent align="start">
               <DropdownMenu.Item>
                 <button
                   onclick={() => (editing_title = true)}
-                  class="hover:text-curing-current flex min-w-40 items-center gap-2 p-2 text-left text-neutral-500 transition-colors duration-150 hover:bg-neutral-500/10">
+                  class="flex min-w-40 items-center gap-2 p-2 text-left text-neutral-500 transition-colors duration-150 hover:bg-neutral-500/10 hover:text-current">
                   <span class="size-5"><Pencil /></span> rename
                 </button>
               </DropdownMenu.Item>
               <DropdownMenu.Item>
                 <button
-                  class="hover:text-curing-current flex min-w-40 items-center gap-2 p-2 text-left text-neutral-500 transition-colors duration-150 hover:bg-neutral-500/10">
+                  onclick={() => (opened_delete_dialog = true)}
+                  class="flex min-w-40 items-center gap-2 p-2 text-left text-neutral-500 transition-colors duration-150 hover:bg-neutral-500/10 hover:text-current">
                   <span class="size-5"><Trash /></span> delete
                 </button>
               </DropdownMenu.Item>
-            </DropdownMenuContent>
+            </MyDropdownMenuContent>
           </DropdownMenu.Root>
         </div>
       </div>
@@ -122,16 +127,43 @@
 
     <Entries entries={data.entries} editable={data.is_self} />
 
-    <form
-      method="POST"
-      action="?/delete_subroutine"
-      use:enhance={() => {
-        return async ({ update }) => {
-          await update({ reset: false });
-        };
-      }}>
-      <input hidden name="subroutine_id" value={data.subroutine.id} />
-      <button type="submit" class="border px-3 py-1 text-xl text-red-500/50">delete</button>
-    </form>
+    <MyDialog bind:open={opened_delete_dialog}>
+      <div class="flex flex-col gap-4">
+        <div class="flex items-center gap-2 text-2xl">
+          <span class="h-8"><Trash /></span> delete {data.subroutine.title}
+        </div>
+
+        <div class="flex justify-center gap-2 text-neutral-500">
+          <span>
+            {diff_days(new Date(data.subroutine.created_at), now)}
+            {diff_days(new Date(data.subroutine.created_at), now) !== 1 ? "days" : "day"} spent
+          </span>
+          <span>·</span>
+          <span>
+            {data.entries.length}
+            {(data.entries.length ?? 0) !== 1 ? "entries" : "entry"}
+          </span>
+        </div>
+
+        <div class="flex gap-2">
+          <button
+            type="button"
+            onclick={() => (opened_delete_dialog = false)}
+            class="grow bg-neutral-500/25 py-1 text-lg">cancel</button>
+          <form
+            method="POST"
+            action="?/delete_subroutine"
+            use:enhance={() => {
+              return async ({ update }) => {
+                await update({ reset: false });
+              };
+            }}
+            class="grow">
+            <input hidden name="subroutine_id" value={data.subroutine.id} />
+            <button type="submit" class="w-full bg-red-500/25 py-1 text-lg">confirm</button>
+          </form>
+        </div>
+      </div>
+    </MyDialog>
   </div>
 {/if}
