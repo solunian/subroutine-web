@@ -67,7 +67,7 @@
                   go_to_page(val);
                 }
               }}
-              class="h-8 w-10 border border-neutral-500/50 bg-transparent px-1 text-center font-mono text-current outline-none focus:border-current" />
+              class="h-8 w-10 border border-neutral-500/50 bg-transparent px-1 text-center text-current outline-none focus:border-current" />
             <span>of {total_pages}</span>
           </div>
 
@@ -100,35 +100,27 @@
     <div>
       {#each visible_entries as entry, idx (entry.id)}
         {@const entry_number = entries.length - page_start - idx - 1}
-        <div class="border-neutral-500/50 not-last:border-b">
+        <div class="flex gap-4 border-neutral-500/50 px-2 py-2 not-last:border-b">
+          <span class="basis-1/12 text-neutral-500/50">{entry_number}</span>
+          <div class="flex w-full items-center justify-between gap-1">
+            <span>{to_fulltime_str(new Date(entry.created_at))}</span>
+            <span class="font-mono text-sm">{JSON.stringify(entry.data)}</span>
+          </div>
           {#if editable}
             <form
               method="POST"
               action="?/delete_entry"
-              class="flex gap-4 px-2 py-2"
               use:enhance={() => {
                 return async ({ update }) => {
                   await update({ reset: false });
                 };
-              }}>
-              <span class="basis-1/12 text-neutral-500/50">{entry_number}</span>
-              <div class="flex w-full items-center justify-between gap-1">
-                <span>{to_fulltime_str(new Date(entry.created_at))}</span>
-                <span class="font-mono text-sm">{JSON.stringify(entry.data)}</span>
-              </div>
+              }}
+              class="h-6">
               <input name="entry_id" value={entry.id} hidden />
               <button aria-label="delete entry" type="submit" class="h-6">
                 <XMark />
               </button>
             </form>
-          {:else}
-            <div class="flex gap-4 px-2 py-2">
-              <span class="basis-1/12 text-neutral-500/50">{entry_number}</span>
-              <div class="flex w-full basis-11/12 items-center justify-between gap-1">
-                <span>{to_fulltime_str(new Date(entry.created_at))}</span>
-                <span class="font-mono text-sm">{JSON.stringify(entry.data)}</span>
-              </div>
-            </div>
           {/if}
         </div>
       {/each}

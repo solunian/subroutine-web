@@ -3,7 +3,7 @@
   import { tick } from "svelte";
   import type { Attachment } from "svelte/attachments";
   import { cubicOut } from "svelte/easing";
-  import { slide } from "svelte/transition";
+  import { fade, fly } from "svelte/transition";
 
   interface SelectOption<Value extends string> {
     value: Value;
@@ -178,7 +178,8 @@
 
   {#if open}
     <div
-      in:slide={{ duration: 200, easing: cubicOut }}
+      in:fly={{ y: -5, duration: 150, easing: cubicOut }}
+      out:fade={{ duration: 90 }}
       id={listbox_id}
       role="listbox"
       aria-label={ariaLabel}
