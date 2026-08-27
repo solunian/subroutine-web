@@ -75,27 +75,30 @@
               </button>
             </form>
           {/if}
-          <DropdownMenu.Root>
-            <DropdownMenu.Trigger class="text-neutral-500">
-              <EllipsisHorizontal />
-            </DropdownMenu.Trigger>
-            <MyDropdownMenuContent align="start">
-              <DropdownMenu.Item>
-                <button
-                  onclick={() => (editing_title = true)}
-                  class="flex min-w-40 items-center gap-2 p-2 text-left text-neutral-500 transition-colors duration-150 hover:bg-neutral-500/10 hover:text-current">
-                  <span class="size-5"><Pencil /></span> rename
-                </button>
-              </DropdownMenu.Item>
-              <DropdownMenu.Item>
-                <button
-                  onclick={() => (opened_delete_dialog = true)}
-                  class="flex min-w-40 items-center gap-2 p-2 text-left text-neutral-500 transition-colors duration-150 hover:bg-neutral-500/10 hover:text-current">
-                  <span class="size-5"><Trash /></span> delete
-                </button>
-              </DropdownMenu.Item>
-            </MyDropdownMenuContent>
-          </DropdownMenu.Root>
+
+          {#if data.is_self}
+            <DropdownMenu.Root>
+              <DropdownMenu.Trigger class="text-neutral-500">
+                <EllipsisHorizontal />
+              </DropdownMenu.Trigger>
+              <MyDropdownMenuContent align="start">
+                <DropdownMenu.Item>
+                  <button
+                    onclick={() => (editing_title = true)}
+                    class="flex min-w-40 items-center gap-2 p-2 text-left text-neutral-500 transition-colors duration-150 hover:bg-neutral-500/10 hover:text-current">
+                    <span class="size-5"><Pencil /></span> rename
+                  </button>
+                </DropdownMenu.Item>
+                <DropdownMenu.Item>
+                  <button
+                    onclick={() => (opened_delete_dialog = true)}
+                    class="flex min-w-40 items-center gap-2 p-2 text-left text-neutral-500 transition-colors duration-150 hover:bg-neutral-500/10 hover:text-current">
+                    <span class="size-5"><Trash /></span> delete
+                  </button>
+                </DropdownMenu.Item>
+              </MyDropdownMenuContent>
+            </DropdownMenu.Root>
+          {/if}
         </div>
       </div>
 
@@ -127,6 +130,7 @@
 
     <Entries entries={data.entries} editable={data.is_self} />
 
+    <!-- delete subroutine dialog -->
     <MyDialog bind:open={opened_delete_dialog}>
       <div class="flex flex-col gap-4">
         <div class="flex items-center gap-2 text-2xl">
