@@ -34,8 +34,10 @@ export const actions: Actions = {
 
     const fdata = await request.formData();
 
-    const current_timestamp = new Date().toISOString();
-
+    const timestamp = v.safeParse(
+      TrimNormalStrSchema,
+      fdata.get("timestamp") ?? new Date().toISOString()
+    );
     const name = v.safeParse(empty_to_null(TrimNormalStrSchema), fdata.get("name"));
     const username = v.safeParse(UsernameSchema, fdata.get("username"));
     const website = v.safeParse(empty_to_null(URLSchema), fdata.get("website"));
@@ -45,9 +47,16 @@ export const actions: Actions = {
     //   fdata.get("avatar_url") ?? undefined
     // );
 
-    if (!name.success || !username.success || !website.success || !bio.success) {
+    if (
+      !timestamp.success ||
+      !name.success ||
+      !username.success ||
+      !website.success ||
+      !bio.success
+    ) {
       return fail(400, {
         errors: {
+          timestamp: timestamp.issues && v.summarize(timestamp.issues),
           name: name.issues && v.summarize(name.issues),
           username: username.issues && v.summarize(username.issues),
           website: website.issues && v.summarize(website.issues),
@@ -60,7 +69,7 @@ export const actions: Actions = {
     const { error } = await supabase
       .from("profiles")
       .update({
-        updated_at: current_timestamp,
+        updated_at: timestamp.output,
         name: name.output,
         username: username.output,
         website: website.output,

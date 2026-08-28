@@ -8,7 +8,9 @@
 
   let loading = $state(false);
 
-  const submit: SubmitFunction = () => {
+  const submit: SubmitFunction = ({ formData }) => {
+    formData.append("timestamp", new Date().toISOString());
+
     loading = true;
     return async ({ update }) => {
       loading = false;
