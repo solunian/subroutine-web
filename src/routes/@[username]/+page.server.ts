@@ -73,21 +73,20 @@ export const actions: Actions = {
     }
 
     const fdata = await request.formData();
-    const other_id_vbot = v.safeParse(TrimNormalStrSchema, fdata.get("other_id"));
-    if (!other_id_vbot.success) {
+    const other_id = v.safeParse(TrimNormalStrSchema, fdata.get("other_id"));
+    if (!other_id.success) {
       return fail(400, {
         errors: {
-          other_id: other_id_vbot.issues && v.summarize(other_id_vbot.issues),
+          other_id: other_id.issues && v.summarize(other_id.issues),
         },
       });
     }
 
-    const other_id = other_id_vbot.output;
     const del_res = await supabase
       .from("relationships")
       .delete()
       .or(
-        `and(requester_id.eq.${user.id},requestee_id.eq.${other_id}),and(requester_id.eq.${other_id},requestee_id.eq.${user.id})`
+        `and(requester_id.eq.${user.id},requestee_id.eq.${other_id.output}),and(requester_id.eq.${other_id.output},requestee_id.eq.${user.id})`
       );
 
     if (del_res.error) {
@@ -104,23 +103,22 @@ export const actions: Actions = {
     }
 
     const fdata = await request.formData();
-    const other_id_vbot = v.safeParse(TrimNormalStrSchema, fdata.get("other_id"));
-    const status_vbot = v.safeParse(RelationshipStatusType, fdata.get("status"));
-    if (!other_id_vbot.success || !status_vbot.success) {
+    const other_id = v.safeParse(TrimNormalStrSchema, fdata.get("other_id"));
+    const status = v.safeParse(RelationshipStatusType, fdata.get("status"));
+    if (!other_id.success || !status.success) {
       return fail(400, {
         errors: {
-          other_id: other_id_vbot.issues && v.summarize(other_id_vbot.issues),
-          status: status_vbot.issues && v.summarize(status_vbot.issues),
+          other_id: other_id.issues && v.summarize(other_id.issues),
+          status: status.issues && v.summarize(status.issues),
         },
       });
     }
 
-    const other_id = other_id_vbot.output;
     const update_res = await supabase
       .from("relationships")
-      .update({ status: status_vbot.output })
+      .update({ status: status.output })
       .or(
-        `and(requester_id.eq.${user.id},requestee_id.eq.${other_id}),and(requester_id.eq.${other_id},requestee_id.eq.${user.id})`
+        `and(requester_id.eq.${user.id},requestee_id.eq.${other_id.output}),and(requester_id.eq.${other_id.output},requestee_id.eq.${user.id})`
       );
 
     if (update_res.error) {

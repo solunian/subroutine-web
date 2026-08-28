@@ -6,7 +6,7 @@
   import Entries from "$lib/components/entries.svelte";
   import Torch from "$lib/components/torch.svelte";
   import TypeIdenticon from "$lib/components/type_identicon.svelte";
-  import { diff_days, to_date_str } from "$lib/helpers";
+  import { diff_days, from_now, to_date_str } from "$lib/helpers";
   import AtSymbol from "$lib/icons/at_symbol.svelte";
   import Check from "$lib/icons/check.svelte";
   import EllipsisHorizontal from "$lib/icons/ellipsis_horizontal.svelte";
@@ -47,8 +47,10 @@
           {:else}
             <form
               method="POST"
-              action="?/edit_subroutine"
-              use:enhance={() => {
+              action="?/update_subroutine"
+              use:enhance={({ formData }) => {
+                formData.append("timestamp", new Date().toISOString());
+
                 return async ({ update }) => {
                   editing_title = false;
                   await update({ reset: false });
@@ -105,6 +107,8 @@
       <div class="flex flex-nowrap items-center gap-2 text-nowrap opacity-50">
         <span>{to_date_str(new Date(data.subroutine.created_at))}</span>
         <span>·</span>
+        <span>updated {from_now(now, new Date(data.subroutine.updated_at))}</span>
+        <span>·</span>
         <span>{data.entries.length} {(data.entries.length ?? 0) !== 1 ? "entries" : "entry"}</span>
       </div>
 
@@ -116,9 +120,17 @@
 
     <div class="max-w-5xl">
       {#if data.subroutine.type === "dot" || data.subroutine.type === "semaphore"}
-        <DotSemaphore editable={data.is_self} subroutine={data.subroutine} entries={data.entries} />
+        <DotSemaphore
+          editable={data.is_self}
+          username={data.username}
+          subroutine={data.subroutine}
+          entries={data.entries} />
       {:else if data.subroutine.type === "torch"}
-        <Torch editable={data.is_self} subroutine={data.subroutine} entries={data.entries} />
+        <Torch
+          editable={data.is_self}
+          username={data.username}
+          subroutine={data.subroutine}
+          entries={data.entries} />
       {:else}
         <div class="flex aspect-video w-full items-center justify-center border font-mono">
           not implemented yet -_-
@@ -128,7 +140,11 @@
 
     <ActivityGrid entries={data.entries} subroutine_type={data.subroutine.type} />
 
-    <Entries entries={data.entries} editable={data.is_self} />
+    <Entries
+      username={data.username}
+      subroutine_id={data.subroutine.id}
+      entries={data.entries}
+      editable={data.is_self} />
 
     <!-- delete subroutine dialog -->
     <MyDialog bind:open={opened_delete_dialog}>

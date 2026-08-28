@@ -1,7 +1,5 @@
 <script lang="ts">
-  import ArrowLeft from "$lib/icons/arrow_left.svelte";
   import ArrowRight from "$lib/icons/arrow_right.svelte";
-  import AtSymbol from "$lib/icons/at_symbol.svelte";
   import NullSet from "$lib/icons/null_set.svelte";
 
   let { data } = $props();

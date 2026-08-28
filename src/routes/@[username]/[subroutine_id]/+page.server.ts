@@ -5,6 +5,7 @@ import {
   DateTimeSchema,
   empty_to_null,
   empty_to_undefined,
+  FinNumberSchema,
   NormalStrSchema,
   TrimNormalStrSchema,
   UUIDSchema,
@@ -25,37 +26,38 @@ export const load: PageServerLoad = async ({
   // load subroutine and entries
   const sub_res = await supabase
     .from("subroutines")
-    .select("*")
+    .select("*, profiles!inner(username), entries(*)")
+    .eq("profiles.username", params.username)
     .eq("id", params.subroutine_id)
+    .order("created_at")
+    .order("created_at", { referencedTable: "entries", ascending: true })
     .single();
+
   if (sub_res.error) {
     error(sub_res.status, sub_res.error.message);
   }
 
-  const entries_res = await supabase
-    .from("entries")
-    .select("*")
-    .eq("subroutine_id", params.subroutine_id)
-    .order("created_at");
-
-  const subroutine = sub_res.data;
-  const entries = entries_res.data ?? [];
-
   return {
-    subroutine,
-    entries,
+    subroutine: sub_res.data,
+    entries: sub_res.data.entries,
   };
 };
 
+// update_subroutine, insert_entry, update_entry, delete_entry: must set the timestamp for subroutines.updated_at.
+
 export const actions: Actions = {
-  edit_subroutine: async ({ request, locals: { safeGetSession, supabase } }) => {
+  update_subroutine: async ({ request, params, locals: { safeGetSession, supabase } }) => {
     const { session } = await safeGetSession();
     if (!session) {
       redirect(303, "/signin");
     }
 
     const fdata = await request.formData();
-    const subroutine_id = v.safeParse(UUIDSchema, fdata.get("subroutine_id"));
+    const timestamp = v.safeParse(
+      TrimNormalStrSchema,
+      fdata.get("timestamp") ?? new Date().toISOString()
+    );
+    const subroutine_id = v.safeParse(UUIDSchema, params.subroutine_id);
     const title = v.safeParse(
       v.optional(v.pipe(TrimNormalStrSchema, v.nonEmpty())),
       fdata.get("title") ?? undefined
@@ -72,9 +74,16 @@ export const actions: Actions = {
       fdata.get("deadline") ?? undefined
     );
 
-    if (!subroutine_id.success || !title.success || !description.success || !deadline.success) {
+    if (
+      !timestamp.success ||
+      !subroutine_id.success ||
+      !title.success ||
+      !description.success ||
+      !deadline.success
+    ) {
       return fail(400, {
         errors: {
+          timestamp: timestamp.issues && v.summarize(timestamp.issues),
           subroutine_id: subroutine_id.issues && v.summarize(subroutine_id.issues),
           title: title.issues && v.summarize(title.issues),
           description: description.issues && v.summarize(description.issues),
@@ -83,7 +92,12 @@ export const actions: Actions = {
       });
     }
 
-    const edit_res = await supabase
+    const updated_at_prom = supabase
+      .from("subroutines")
+      .update({ updated_at: timestamp.output })
+      .eq("id", subroutine_id.output);
+
+    const update_prom = supabase
       .from("subroutines")
       .update({
         title: title.output,
@@ -92,20 +106,25 @@ export const actions: Actions = {
       })
       .eq("id", subroutine_id.output);
 
-    if (edit_res.error) {
-      return fail(edit_res.status, { message: edit_res.error.message });
+    const [updated_at_res, update_res] = await Promise.all([updated_at_prom, update_prom]);
+
+    if (updated_at_res.error) {
+      return fail(updated_at_res.status, { message: updated_at_res.error.message });
     }
 
-    return { form_name: "edit_subroutine" };
+    if (update_res.error) {
+      return fail(update_res.status, { message: update_res.error.message });
+    }
+
+    return { form_name: "update_subroutine" };
   },
-  delete_subroutine: async ({ request, locals: { safeGetSession, supabase } }) => {
+  delete_subroutine: async ({ params, locals: { safeGetSession, supabase } }) => {
     const { session } = await safeGetSession();
     if (!session) {
       redirect(303, "/signin");
     }
 
-    const fdata = await request.formData();
-    const subroutine_id = v.safeParse(TrimNormalStrSchema, fdata.get("subroutine_id"));
+    const subroutine_id = v.safeParse(UUIDSchema, params.subroutine_id);
     if (!subroutine_id.success) {
       return fail(400, {
         errors: {
@@ -122,15 +141,88 @@ export const actions: Actions = {
 
     redirect(303, "/");
   },
-  edit_entry: async ({ request, locals: { safeGetSession, supabase } }) => {
+  insert_entry: async ({ request, locals: { supabase, safeGetSession } }) => {
     const { session } = await safeGetSession();
     if (!session) {
       redirect(303, "/signin");
     }
 
     const fdata = await request.formData();
+
+    // data validation
+    const timestamp = v.safeParse(
+      TrimNormalStrSchema,
+      fdata.get("timestamp") ?? new Date().toISOString()
+    );
+    const subroutine_id = v.safeParse(TrimNormalStrSchema, fdata.get("subroutine_id"));
+    const subroutine_type = v.safeParse(
+      v.nullable(TrimNormalStrSchema),
+      fdata.get("subroutine_type")
+    );
+
+    if (!subroutine_id.success || !timestamp.success || !subroutine_type.success) {
+      return fail(400, {
+        errors: {
+          timestamp: timestamp.issues && v.summarize(timestamp.issues),
+          subroutine_id: subroutine_id.issues && v.summarize(subroutine_id.issues),
+          subroutine_type: subroutine_type.issues && v.summarize(subroutine_type.issues),
+        },
+      });
+    }
+
+    // db queries
+    // custom data json for each subroutine
+    const custom_data_map = new Map();
+    if (subroutine_type.output) {
+      if (subroutine_type.output === "semaphore") {
+        const value = v.safeParse(FinNumberSchema, fdata.get("value"));
+        if (!value.success) {
+          return fail(400, {
+            errors: {
+              value: value.issues && v.summarize(value.issues),
+            },
+          });
+        }
+
+        custom_data_map.set("value", value.output);
+      }
+    }
+
+    const updated_at_prom = supabase
+      .from("subroutines")
+      .update({ updated_at: timestamp.output })
+      .eq("id", subroutine_id.output);
+
+    const new_entry_prom = supabase.from("entries").insert({
+      created_at: timestamp.output,
+      subroutine_id: subroutine_id.output,
+      user_id: session.user.id,
+      data: custom_data_map.size === 0 ? null : Object.fromEntries(custom_data_map),
+    });
+
+    const [updated_at_res, new_entry_res] = await Promise.all([updated_at_prom, new_entry_prom]);
+
+    if (updated_at_res.error) {
+      return fail(updated_at_res.status, { message: updated_at_res.error.message });
+    }
+
+    if (new_entry_res.error) {
+      return fail(new_entry_res.status, { message: new_entry_res.error.message });
+    }
+  },
+  update_entry: async ({ request, params, locals: { safeGetSession, supabase } }) => {
+    const { session } = await safeGetSession();
+    if (!session) {
+      redirect(303, "/signin");
+    }
+
+    const fdata = await request.formData();
+    const timestamp = v.safeParse(
+      TrimNormalStrSchema,
+      fdata.get("timestamp") ?? new Date().toISOString()
+    );
     const entry_id = v.safeParse(UUIDSchema, fdata.get("entry_id"));
-    const subroutine_id = v.safeParse(UUIDSchema, fdata.get("subroutine_id"));
+    const subroutine_id = v.safeParse(UUIDSchema, params.subroutine_id);
     const title = v.safeParse(v.optional(TrimNormalStrSchema), fdata.get("title") ?? undefined);
     const description = v.safeParse(
       v.optional(NormalStrSchema),
@@ -141,6 +233,7 @@ export const actions: Actions = {
     const data = v.safeParse(v.optional(NormalStrSchema), fdata.get("data") ?? undefined);
 
     if (
+      !timestamp.success ||
       !entry_id.success ||
       !subroutine_id.success ||
       // !created_at.success ||
@@ -152,6 +245,7 @@ export const actions: Actions = {
     ) {
       return fail(400, {
         errors: {
+          timestamp: timestamp.issues && v.summarize(timestamp.issues),
           entry_id: entry_id.issues && v.summarize(entry_id.issues),
           subroutine_id: subroutine_id.issues && v.summarize(subroutine_id.issues),
           // created_at: created_at.issues && v.summarize(created_at.issues),
@@ -164,7 +258,12 @@ export const actions: Actions = {
       });
     }
 
-    const edit_res = await supabase
+    const updated_at_prom = supabase
+      .from("subroutines")
+      .update({ updated_at: timestamp.output })
+      .eq("id", subroutine_id.output);
+
+    const update_prom = supabase
       .from("entries")
       .update({
         title: title.output,
@@ -177,30 +276,53 @@ export const actions: Actions = {
       .select("id")
       .single();
 
-    if (edit_res.error) {
-      return fail(edit_res.status, { message: edit_res.error.message });
+    const [updated_at_res, update_res] = await Promise.all([updated_at_prom, update_prom]);
+
+    if (updated_at_res.error) {
+      return fail(updated_at_res.status, { message: updated_at_res.error.message });
     }
 
-    return { form_name: "edit_entry", entry_id: edit_res.data.id };
+    if (update_res.error) {
+      return fail(update_res.status, { message: update_res.error.message });
+    }
+
+    return { form_name: "update_entry", entry_id: update_res.data.id };
   },
-  delete_entry: async ({ request, locals: { safeGetSession, supabase } }) => {
+  delete_entry: async ({ request, params, locals: { safeGetSession, supabase } }) => {
     const { session } = await safeGetSession();
     if (!session) {
       redirect(303, "/signin");
     }
 
     const fdata = await request.formData();
-    const entry_id_vbot = v.safeParse(TrimNormalStrSchema, fdata.get("entry_id"));
-    if (!entry_id_vbot.success) {
+    const timestamp = v.safeParse(
+      TrimNormalStrSchema,
+      fdata.get("timestamp") ?? new Date().toISOString()
+    );
+    const subroutine_id = v.safeParse(UUIDSchema, params.subroutine_id);
+    const entry_id = v.safeParse(UUIDSchema, fdata.get("entry_id"));
+    if (!timestamp.success || !subroutine_id.success || !entry_id.success) {
       return fail(400, {
         errors: {
-          entry_id: entry_id_vbot.issues && v.summarize(entry_id_vbot.issues),
+          timestamp: timestamp.issues && v.summarize(timestamp.issues),
+          subroutine_id: subroutine_id.issues && v.summarize(subroutine_id.issues),
+          entry_id: entry_id.issues && v.summarize(entry_id.issues),
         },
       });
     }
 
-    const del_res = await supabase.from("entries").delete().eq("id", entry_id_vbot.output);
+    const updated_at_prom = supabase
+      .from("subroutines")
+      .update({ updated_at: timestamp.output })
+      .eq("id", subroutine_id.output);
 
+    const del_prom = supabase.from("entries").delete().eq("id", entry_id.output);
+
+    const [updated_at_res, del_res] = await Promise.all([updated_at_prom, del_prom]);
+
+    if (updated_at_res.error) {
+      return fail(updated_at_res.status, { message: updated_at_res.error.message });
+    }
     if (del_res.error) {
       return fail(del_res.status, { message: del_res.error.message });
     }

@@ -8,11 +8,13 @@
   import TypeIdenticon from "./type_identicon.svelte";
 
   let {
+    username,
     subroutine,
     entries = [],
     href,
     editable = false,
   }: {
+    username: string;
     subroutine: Tables<"subroutines">;
     entries?: Tables<"entries">[];
     href?: string;
@@ -42,10 +44,10 @@
   {#if editable}
     <form
       method="POST"
-      action="/?/append"
+      action="/@{username}/{subroutine.id}?/insert_entry"
       use:enhance={({ formData }) => {
         const created_at = new Date().toISOString();
-        formData.append("created_at", created_at);
+        formData.append("timestamp", created_at);
 
         // optimistic update
         optimistic_entries.push({

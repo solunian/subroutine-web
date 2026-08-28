@@ -23,7 +23,7 @@
       <span class="size-10 animate-[spin_7s_linear_infinite]"><Cog /></span>
       <span>/settings</span>
     </h1>
-    <form method="POST" action="?/update" use:enhance={submit} class="flex w-full flex-col gap-2">
+    <form method="POST" use:enhance={submit} class="flex w-full flex-col gap-2">
       {form?.message}
 
       <div>
