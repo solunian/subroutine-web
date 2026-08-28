@@ -25,7 +25,7 @@
 </script>
 
 <main class="flex flex-col gap-2 py-2">
-  {#if data.session}
+  {#if data.session && data.username}
     {#each subtype_display_order as subtype (subtype)}
       <h2 class="flex items-center gap-1 p-2 text-xl">
         <TypeIdenticon type={subtype} /><span>{subtype}</span>
@@ -37,18 +37,21 @@
           {#each grouped_subroutines.get(subtype) as sub (sub.id)}
             {#if sub.type === "dot" || sub.type === "semaphore"}
               <DotSemaphore
+                username={data.username}
                 subroutine={sub}
                 entries={sub.entries}
                 href="/@{data.username}/{sub.id}"
                 editable />
             {:else if sub.type === "torch"}
               <Torch
+                username={data.username}
                 subroutine={sub}
                 entries={sub.entries}
                 href="/@{data.username}/{sub.id}"
                 editable />
             {:else if sub.type === "journal"}
               <Journal
+                username={data.username}
                 subroutine={sub}
                 entries={sub.entries}
                 href="/@{data.username}/{sub.id}"
